@@ -14,15 +14,18 @@ type graph struct {
 	sequence *list.List
 }
 
+// Ребро графа состоящее из двух узлов-точек и имеющее вес
 type edge struct {
-	parent node
-	child  node
+	point1 node
+	point2 node
 	weight float64
+	status bool
 }
 
+// Узел графа имеющий базовое состояние имя:стоимость и статус - активен узел или нет
 type node struct {
 	state
-	status bool
+	// status bool
 }
 
 // Состояние узла является картой в которой ключ имя узла, а значение его стоимость
@@ -49,35 +52,44 @@ func (n node) String() string {
 	return fmt.Sprintf("%s(%.2f)", n.name(), n.cost())
 }
 
-// Строковое представление искомого списка графа
-func (g *graph) String() string {
-	f := g.sequence.Front()
-	s := fmt.Sprintf("%v", f.Value)
-	for i := 1; i < g.sequence.Len(); i++ {
-		if f.Value == nil {
-			break
-		}
-		s = s + fmt.Sprintf("-->%v", f.Next().Value)
-		f = f.Next()
+// Строковое представление результатов графа
+func (g *graph) String() (s string) {
+	for i := range g.nodes {
+		s = s + fmt.Sprintf("%v ", g.nodes[i])
 	}
 	return s
 }
 
+// Строковое представление кратчайшего пути
+// Еще не дописано...
+// func (g *graph) String() string {
+// 	f := g.sequence.Front()
+// 	s := fmt.Sprintf("%v", f.Value)
+// 	for i := 1; i < g.sequence.Len(); i++ {
+// 		if f.Value == nil {
+// 			break
+// 		}
+// 		s = s + fmt.Sprintf("-->%v", f.Next().Value)
+// 		f = f.Next()
+// 	}
+// 	return s
+// }
+
 // Добавляет новое ребро в граф
-func (g *graph) addEdge(p, c node, w float64) {
+func (g *graph) addEdge(p1, p2 node, w float64) {
 	// проверка на существование родительского и дочернего узла
-	if len(p.state) == 0 || len(c.state) == 0 {
+	if len(p1.state) == 0 || len(p2.state) == 0 {
 		// ?может быть нужно сообщение что один из узлов ребра не существует
 		return
 	}
 	// проверка на существование такого же ребра в графе
 	for i := range g.edges {
-		if g.edges[i].parent.name() == p.name() && g.edges[i].child.name() == c.name() {
+		if g.edges[i].point1.name() == p1.name() && g.edges[i].point2.name() == p2.name() {
 			// ?может быть нужно сообщение о существовании такого ребра, если найдется
 			return
 		}
 	}
-	e := edge{p, c, w}
+	e := edge{p1, p2, w, true}
 	g.edges = append(g.edges, e)
 }
 
@@ -90,45 +102,29 @@ func (g *graph) addNode(n string) node {
 		}
 	}
 	// по умолчанию узел добавляется со стоимостью равной бесконечености и включенным статусом
-	nn := node{state: map[string]float64{n: inf}, status: true}
+	nn := node{state: map[string]float64{n: inf}}
 	g.nodes = append(g.nodes, nn)
 	return nn
 }
 
-// Исключает узел из дальнейших поисков выключая его статус
-func (g *graph) offNode(n node) {
-	for i := range g.nodes {
-		if g.nodes[i].name() == n.name() {
-			g.nodes[i].status = false
-			return
+// Исключает ребро из дальнейших поисков выключая его статус, если хоть один из узлов ребра был обработан
+func (g *graph) offEdge(n string) {
+	for i := range g.edges {
+		if g.edges[i].point1.name() == n || g.edges[i].point2.name() == n {
+			g.edges[i].status = false
 		}
 	}
 }
 
-// Поиск узла с минимальной стоимостью относительно заданного узла
-func (g *graph) lowCostNode(n node) string {
-	// обхожу граф по ребрам и нахожу ребра у которых родитель=заданный узел и собираю в список дочерние узлы
-	// в момент сбора дочерних узлов их стоимость надо установить равной текущая стоимость+вес ребра
-	// обхожу этот список в поиске узла с минимальной стоимостью (и статусом=труу?, чтоб не проверять выключенные) и возвращаю его
-	// если две вершины имеют одинаковую стоимость, то будет выбрана одна из них, а вторая выберется на втором шаге
-	var nodes []node
-	for i := range g.edges {
-		if g.edges[i].parent.name() == n.name() {
-			if !g.edges[i].child.status {
-				continue
-			}
-			w := g.edges[i].weight
-			c := g.edges[i].child.cost()
-			if c == inf {
-				c = w
-			}
-			c = c + w
-			g.setCostNode(g.edges[i].child.name(), c)
-			nodes = append(nodes, g.edges[i].child)
+// Установка стоимости узла
+func (g *graph) setCostNode(n node, c float64) {
+	name := n.name()
+	for i := range g.nodes {
+		if g.nodes[i].name() == name {
+			g.nodes[i].state[name] = c
+			return
 		}
 	}
-	min := minCost(nodes)
-	return min.name()
 }
 
 func minCost(ns []node) node {
@@ -138,54 +134,101 @@ func minCost(ns []node) node {
 		}
 		return ns[1]
 	}
-	min := minCost(ns[1:])
+	min := minCost(ns[1:]) //рекурсия
 	if ns[0].cost() < min.cost() {
 		return ns[0]
 	}
 	return min
 }
 
-// Установка стоимости узла
-func (g *graph) setCostNode(n string, c float64) {
-	for i := range g.nodes {
-		if g.nodes[i].name() == n {
-			g.nodes[i].state[n] = c
-			return
+// Принимается список противоположных узлов,
+func (g *graph) updateCost(ns []node, n node, cw float64) []node {
+	c := n.cost()
+	if c > cw {
+		c = cw
+	}
+	g.setCostNode(n, c)
+	return append(ns, n)
+}
+
+// Поиск узла с минимальной стоимостью относительно заданного узла
+func (g *graph) lowCostNode(n node) {
+	// Обхожу граф по ребрам и нахожу ребра у которых одна из точек заданный узел и собираю в список противоположный узел.
+	// В момент добавления узла в список, определяется и выставляется его стоимость равная текущей стоимости + вес ребра,
+	// если стоимость была равна бесконечности, то естественно стоимость будет равна 0 + вес ребра.
+	//
+	// Обхожу список этих узлов в поиске узла с наименьшей стоимостью и при условии, что узел активен.
+	var nodes []node
+	for i := range g.edges {
+		if !g.edges[i].status {
+			continue
+		}
+		switch n.name() {
+		case g.edges[i].point1.name():
+			nodes = g.updateCost(nodes, g.edges[i].point2, g.edges[i].point1.cost()+g.edges[i].weight)
+		case g.edges[i].point2.name():
+			nodes = g.updateCost(nodes, g.edges[i].point1, g.edges[i].point2.cost()+g.edges[i].weight)
 		}
 	}
+	fmt.Println(nodes)
+
+	g.offEdge(n.name())
+	fmt.Println("off:", n)
+	if len(nodes) == 1 {
+		return
+	}
+	min := minCost(nodes) //рекурсия
+	fmt.Println("min:", min)
+	g.lowCostNode(min) //рекурсия
+	return
 }
 
 // Запуск основного алгоритма поиска по заданным начальному и конечному узлу
-// в качестве возвращаемого значения можно очередь или двусвязный список
-func (g *graph) Dijkstra(start, end node) *list.List {
+// в качестве возвращаемого значения можно использовать очередь или двусвязный список
+// второй аргумент функции(end) является не обязательным. Если его нет, то функция просто подсчитает стоимость
+// всех узлов графа относительно стартового узла. Если он есть, то функция выведет кратчайший маршрут от начала до конца.
+// Еще не дописано...
+func (g *graph) dijkstra(start node, end ...node) *list.List {
 	// у стартого узла надо установить стоимость = 0 и вставить его в начало списка
-	g.setCostNode(start.name(), 0)
-	g.sequence = list.New()
-	g.sequence.PushFront(start)
-	// g.sequence.InsertAfter(end, e)
-	g.sequence.PushBack(end)
-	fmt.Println(g.lowCostNode(start))
+	if len(end) == 0 {
+		g.setCostNode(start, 0)
+		g.sequence = list.New()
+		g.sequence.PushFront(start)
+		// g.sequence.InsertAfter(end, e)
+		g.sequence.PushBack(end)
+		fmt.Println("start:", start)
+		g.lowCostNode(start)
+	}
+	// fmt.Println("маршрут")
 	return g.sequence
 }
 
 func main() {
 	g := &graph{}
-	s := g.addNode("start")
-	a := g.addNode("a")
-	b := g.addNode("b")
-	c := g.addNode("с")
+	a1 := g.addNode("1")
+	b2 := g.addNode("2")
+	c3 := g.addNode("3")
+	d4 := g.addNode("4")
+	e5 := g.addNode("5")
+	f6 := g.addNode("6")
 
-	g.addEdge(s, a, 7)
-	g.addEdge(s, b, 7)
-	g.addEdge(b, c, 14)
-	g.addEdge(a, c, 25)
+	g.addEdge(a1, b2, 7)
+	g.addEdge(a1, c3, 9)
+	g.addEdge(a1, f6, 14)
+	g.addEdge(b2, c3, 10)
+	g.addEdge(b2, d4, 15)
+	g.addEdge(c3, d4, 11)
+	g.addEdge(c3, f6, 2)
+	g.addEdge(e5, f6, 9)
+	g.addEdge(d4, e5, 6)
 
-	// g.offNode(a)
-	// g.setCostNode("b", 777)
+	// fmt.Println("***Смена стоимости и статуса через граф ***")
+	// g.offNode(a.name())
+	// g.setCostNode(a, 999)
+	// g.setCostNode(b, 777)
 
-	// fmt.Println(b)
-
-	g.Dijkstra(s, c)
+	g.dijkstra(a1)
 
 	fmt.Println(g)
+
 }
