@@ -19,17 +19,53 @@ type edge struct {
 	point1 node
 	point2 node
 	weight float64
-	status bool
+	// status bool
 }
 
 // Узел графа имеющий базовое состояние имя:стоимость и статус - активен узел или нет
 type node struct {
 	state
-	// status bool
+	status bool
 }
 
 // Состояние узла является картой в которой ключ имя узла, а значение его стоимость
 type state map[string]float64
+
+func newGraph() *graph {
+	return &graph{}
+}
+
+func (g *graph) addNode(n string) node {
+	// проверка на существование такого же узла в графе
+	for i := range g.nodes {
+		if g.nodes[i].name() == n {
+			// ?может быть нужно сообщение о существовании такого узла, если найдется
+			return node{}
+		}
+	}
+	// по умолчанию узел добавляется со стоимостью равной бесконечености и включенным статусом
+	nn := node{state: map[string]float64{n: inf}, status: true}
+	g.nodes = append(g.nodes, nn)
+	return nn
+}
+
+// Добавляет новое ребро в граф
+func (g *graph) addEdge(p1, p2 node, w float64) {
+	// проверка на существование родительского и дочернего узла
+	if len(p1.state) == 0 || len(p2.state) == 0 {
+		// ?может быть нужно сообщение что один из узлов ребра не существует
+		return
+	}
+	// проверка на существование такого же ребра в графе
+	for i := range g.edges {
+		if g.edges[i].point1.name() == p1.name() && g.edges[i].point2.name() == p2.name() {
+			// ?может быть нужно сообщение о существовании такого ребра, если найдется
+			return
+		}
+	}
+	e := edge{p1, p2, w}
+	g.edges = append(g.edges, e)
+}
 
 // Возвращает имя узла
 func (n node) name() (key string) {
@@ -53,12 +89,12 @@ func (n node) String() string {
 }
 
 // Строковое представление результатов графа
-func (g *graph) String() (s string) {
-	for i := range g.nodes {
-		s = s + fmt.Sprintf("%v ", g.nodes[i])
-	}
-	return s
-}
+// func (g *graph) String() (s string) {
+// 	for i := range g.nodes {
+// 		s = s + fmt.Sprintf("%v ", g.nodes[i])
+// 	}
+// 	return s
+// }
 
 // Строковое представление кратчайшего пути
 // Еще не дописано...
@@ -75,43 +111,21 @@ func (g *graph) String() (s string) {
 // 	return s
 // }
 
-// Добавляет новое ребро в граф
-func (g *graph) addEdge(p1, p2 node, w float64) {
-	// проверка на существование родительского и дочернего узла
-	if len(p1.state) == 0 || len(p2.state) == 0 {
-		// ?может быть нужно сообщение что один из узлов ребра не существует
-		return
-	}
-	// проверка на существование такого же ребра в графе
-	for i := range g.edges {
-		if g.edges[i].point1.name() == p1.name() && g.edges[i].point2.name() == p2.name() {
-			// ?может быть нужно сообщение о существовании такого ребра, если найдется
-			return
-		}
-	}
-	e := edge{p1, p2, w, true}
-	g.edges = append(g.edges, e)
-}
-
-func (g *graph) addNode(n string) node {
-	// проверка на существование такого же узла в графе
-	for i := range g.nodes {
-		if g.nodes[i].name() == n {
-			// ?может быть нужно сообщение о существовании такого узла, если найдется
-			return node{}
-		}
-	}
-	// по умолчанию узел добавляется со стоимостью равной бесконечености и включенным статусом
-	nn := node{state: map[string]float64{n: inf}}
-	g.nodes = append(g.nodes, nn)
-	return nn
-}
-
 // Исключает ребро из дальнейших поисков выключая его статус, если хоть один из узлов ребра был обработан
-func (g *graph) offEdge(n string) {
-	for i := range g.edges {
-		if g.edges[i].point1.name() == n || g.edges[i].point2.name() == n {
-			g.edges[i].status = false
+// func (g *graph) offEdge(n string) {
+// 	for i := range g.edges {
+// 		if g.edges[i].point1.name() == n || g.edges[i].point2.name() == n {
+// 			g.edges[i].status = false
+// 		}
+// 	}
+// }
+
+// Исключает узел из дальнейших поисков выключая его статус
+func (g *graph) offNode(n node) {
+	for i := range g.nodes {
+		if g.nodes[i].name() == n.name() {
+			g.nodes[i].status = false
+			return
 		}
 	}
 }
@@ -127,6 +141,7 @@ func (g *graph) setCostNode(n node, c float64) {
 	}
 }
 
+//Рекурсивный поиск минимального элемента в списке
 func minCost(ns []node) node {
 	if len(ns) == 2 {
 		if ns[0].cost() < ns[1].cost() {
@@ -141,8 +156,11 @@ func minCost(ns []node) node {
 	return min
 }
 
-// Принимается список противоположных узлов,
+// Обновление стоимости узла
 func (g *graph) updateCost(ns []node, n node, cw float64) []node {
+	if !n.status {
+		return ns
+	}
 	c := n.cost()
 	if c > cw {
 		c = cw
@@ -154,31 +172,37 @@ func (g *graph) updateCost(ns []node, n node, cw float64) []node {
 // Поиск узла с минимальной стоимостью относительно заданного узла
 func (g *graph) lowCostNode(n node) {
 	// Обхожу граф по ребрам и нахожу ребра у которых одна из точек заданный узел и собираю в список противоположный узел.
-	// В момент добавления узла в список, определяется и выставляется его стоимость равная текущей стоимости + вес ребра,
-	// если стоимость была равна бесконечности, то естественно стоимость будет равна 0 + вес ребра.
-	//
+	// В момент добавления узла в список, определяется и выставляется его стоимость равная текущей стоимости + вес ребра
 	// Обхожу список этих узлов в поиске узла с наименьшей стоимостью и при условии, что узел активен.
+
 	var nodes []node
 	for i := range g.edges {
-		if !g.edges[i].status {
-			continue
-		}
+		// if !g.edges[i].status {
+		// 	continue
+		// }
 		switch n.name() {
 		case g.edges[i].point1.name():
 			nodes = g.updateCost(nodes, g.edges[i].point2, g.edges[i].point1.cost()+g.edges[i].weight)
+
 		case g.edges[i].point2.name():
 			nodes = g.updateCost(nodes, g.edges[i].point1, g.edges[i].point2.cost()+g.edges[i].weight)
 		}
 	}
-	fmt.Println(nodes)
+	// fmt.Println(nodes)
+	//!Сейчас работает не правильно. Нельзя полностью исключать ребро если хоть один из узлов выключен
+	//!Надо продумать другое отключение. Видимо надо отключать только противоположный узел!
+	// При отключении узла, нужна функция, которая будет определять какому ребру принадлежит
+	// данный узел. В этом ребре определять какая из двух точек является этим узлом и отключать
+	// эту точку еще и в списке ребер внутри графа.
+	g.offNode(n)
 
-	g.offEdge(n.name())
-	fmt.Println("off:", n)
+	// g.offEdge(n.name())
+	// fmt.Println("off:", n)
 	if len(nodes) == 1 {
 		return
 	}
 	min := minCost(nodes) //рекурсия
-	fmt.Println("min:", min)
+	// fmt.Println("min:", min)
 	g.lowCostNode(min) //рекурсия
 	return
 }
@@ -196,7 +220,6 @@ func (g *graph) dijkstra(start node, end ...node) *list.List {
 		g.sequence.PushFront(start)
 		// g.sequence.InsertAfter(end, e)
 		g.sequence.PushBack(end)
-		fmt.Println("start:", start)
 		g.lowCostNode(start)
 	}
 	// fmt.Println("маршрут")
@@ -204,7 +227,8 @@ func (g *graph) dijkstra(start node, end ...node) *list.List {
 }
 
 func main() {
-	g := &graph{}
+	g := newGraph()
+
 	a1 := g.addNode("1")
 	b2 := g.addNode("2")
 	c3 := g.addNode("3")
@@ -222,13 +246,15 @@ func main() {
 	g.addEdge(e5, f6, 9)
 	g.addEdge(d4, e5, 6)
 
-	// fmt.Println("***Смена стоимости и статуса через граф ***")
-	// g.offNode(a.name())
-	// g.setCostNode(a, 999)
-	// g.setCostNode(b, 777)
+	// g.dijkstra(a1)
 
-	g.dijkstra(a1)
+	g.offNode(a1)
+	g.offNode(d4)
 
-	fmt.Println(g)
+	for i := range g.nodes {
+		fmt.Println(g.nodes[i].status)
+	}
+
+	// fmt.Println(g)
 
 }
