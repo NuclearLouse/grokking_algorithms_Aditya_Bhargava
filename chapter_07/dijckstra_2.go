@@ -9,6 +9,7 @@
 package main
 
 import (
+	"container/list"
 	"fmt"
 	"math"
 )
@@ -16,6 +17,7 @@ import (
 type graph struct {
 	nodes
 	edges
+	sequence *list.List
 }
 
 type nodes map[string]node
@@ -123,9 +125,40 @@ func (g *graph) findLowCosts(n node) {
 	g.findLowCosts(lowNode)           // рекурсивно повторяю поиск соседей для найденного минимального узла
 }
 
-func (g *graph) dijkstra(start node) {
+func (g *graph) createRoute(n node) {
+	neighbours := g.nodes[n.name].neighbour
+	for i := range neighbours {
+		if (n.cost - g.checkEdge(n.name, neighbours[i])) == 0 {
+			// if g.nodes[neighbours[i]].cost == 0 {
+			g.sequence.PushFront(g.nodes[neighbours[i]])
+			return
+		}
+		if g.nodes[neighbours[i]].cost == (n.cost - g.checkEdge(n.name, neighbours[i])) {
+			g.sequence.PushFront(g.nodes[neighbours[i]])
+			g.createRoute(g.nodes[neighbours[i]])
+		}
+	}
+}
+
+func (g *graph) dijkstra(start node, end ...node) {
 	n := g.setCost(start, 0)
 	g.findLowCosts(n)
+	if len(end) != 0 {
+		g.sequence = list.New()
+		endNode := g.nodes[end[0].name]
+		g.sequence.PushBack(endNode)
+		g.createRoute(endNode)
+		f := g.sequence.Front()
+		s := fmt.Sprintf("%v", f.Value)
+		for i := 1; i < g.sequence.Len(); i++ {
+			if f.Value == nil {
+				break
+			}
+			s = s + fmt.Sprintf("-->%v", f.Next().Value)
+			f = f.Next()
+		}
+		fmt.Println("Кратчайший путь: ", s)
+	}
 }
 
 func main() {
@@ -147,18 +180,7 @@ func main() {
 	g.addEdge(e5, f6, 9)
 	g.addEdge(d4, e5, 6)
 
-	// fmt.Println("Узел в графе по имени:", g.nodes["a"])
-	// fmt.Println("Статус узла в графе по имени:", g.nodes["a"].status)
-	// fmt.Println("Соседи узла:", g.nodes["a"].neighbour)
-	// fmt.Println("***Updates***")
-
-	// g.setCost(b, 123)
-	// g.offNode(b)
-
-	// fmt.Println(g.nodes["b"], g.nodes["b"].status)
-	// fmt.Println("Весь граф:", g)
-
-	g.dijkstra(a1)
+	g.dijkstra(e5, a1) //при поиске e5-a1 ошибки
 	fmt.Println("Весь граф:", g)
 
 }
