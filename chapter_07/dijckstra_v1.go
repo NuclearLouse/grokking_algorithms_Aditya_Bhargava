@@ -1,5 +1,5 @@
-// Версия с обходами узлов и ребер  в циклах даже при небольшом графе в 17 раз медленнее
-// версии с представлением узлов и ребер в виде хэш таблиц. И требует операций с памятью.
+// Версия с обходами узлов и ребер  в циклах даже при небольшом графе в 17 раз медленнее версии
+// с представлением узлов и ребер в виде хэш таблиц. И требует операций с памятью.
 // goos: windows
 // goarch: amd64
 // pkg: github.com/NuclearLouse/grokking_algorithms_Aditya_Bhargava/chapter_07
@@ -103,21 +103,6 @@ func (g *graph) String() (s string) {
 	return s
 }
 
-// Строковое представление кратчайшего пути
-// Еще не дописано...
-// func (g *graph) String() string {
-// 	f := g.sequence.Front()
-// 	s := fmt.Sprintf("%v", f.Value)
-// 	for i := 1; i < g.sequence.Len(); i++ {
-// 		if f.Value == nil {
-// 			break
-// 		}
-// 		s = s + fmt.Sprintf("-->%v", f.Next().Value)
-// 		f = f.Next()
-// 	}
-// 	return s
-// }
-
 // Исключает узел из дальнейших поисков выключая его статус
 func (g *graph) offNode(n node) {
 	for i := range g.nodes {
@@ -210,18 +195,9 @@ func (g *graph) lowCostNode(n node) {
 // второй аргумент функции(end) является не обязательным. Если его нет, то функция просто подсчитает стоимость
 // всех узлов графа относительно стартового узла. Если он есть, то функция выведет кратчайший маршрут от начала до конца.
 // Еще не дописано...
-func (g *graph) dijkstra(start node, end ...node) *list.List {
-	// у стартого узла надо установить стоимость = 0 и вставить его в начало списка
-	if len(end) == 0 {
-		g.setCostNode(start, 0)
-		g.sequence = list.New()
-		g.sequence.PushFront(start)
-		// g.sequence.InsertAfter(end, e)
-		g.sequence.PushBack(end)
-		g.lowCostNode(start)
-	}
-	// fmt.Println("маршрут")
-	return g.sequence
+func (g *graph) dijkstra(start node) {
+	g.setCostNode(start, 0)
+	g.lowCostNode(start)
 }
 
 func main() {
@@ -245,10 +221,5 @@ func main() {
 	g.addEdge(d4, e5, 6)
 
 	g.dijkstra(a1)
-
-	// g.offNode(a1)
-	// g.offNode(d4)
-
 	fmt.Println(g)
-
 }
