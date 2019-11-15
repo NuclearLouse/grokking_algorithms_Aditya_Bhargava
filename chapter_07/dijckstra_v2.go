@@ -125,16 +125,19 @@ func (g *graph) findLowCosts(n node) {
 	g.findLowCosts(lowNode)           // рекурсивно повторяю поиск соседей для найденного минимального узла
 }
 
-func (g *graph) createRoute(n node) {
+func (g *graph) createRoute(start, n node) {
 	neighbours := g.nodes[n.name].neighbour
 	for i := range neighbours {
 		switch n.cost - g.checkEdge(n.name, neighbours[i]) {
 		case 0:
-			g.sequence.PushFront(g.nodes[neighbours[i]])
-			return
+			if neighbours[i] == start.name {
+				g.sequence.PushFront(g.nodes[neighbours[i]])
+				return
+			}
+
 		case g.nodes[neighbours[i]].cost:
 			g.sequence.PushFront(g.nodes[neighbours[i]])
-			g.createRoute(g.nodes[neighbours[i]])
+			g.createRoute(start, g.nodes[neighbours[i]])
 		}
 	}
 }
@@ -146,9 +149,10 @@ func (g *graph) dijkstra(start node, end ...node) {
 		g.sequence = list.New()
 		endNode := g.nodes[end[0].name]
 		g.sequence.PushBack(endNode)
-		g.createRoute(endNode)
+		g.createRoute(n, endNode)
 		f := g.sequence.Front()
 		s := fmt.Sprintf("%v", f.Value)
+		fmt.Println(s)
 		for i := 1; i < g.sequence.Len(); i++ {
 			if f.Value == nil {
 				break
@@ -179,7 +183,9 @@ func main() {
 	g.addEdge(e5, f6, 9)
 	g.addEdge(e5, d4, 6)
 
-	g.dijkstra(e5, a1) //при поиске e5-a1 ошибки 3 должно быть 3(11.00) и путь 5-6-3-1
+	g.dijkstra(e5, a1)
+	//при поиске e5-a1 ошибка, узел#3 должен быть 3(11.00) и путь 5-6-3-1
+	// вручную этот путь также не определится
 	fmt.Println("Весь граф:", g)
 
 }
