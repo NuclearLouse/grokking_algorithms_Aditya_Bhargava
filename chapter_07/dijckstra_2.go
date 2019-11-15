@@ -115,7 +115,7 @@ func (g *graph) findLowCosts(n node) {
 			neighbour = g.setCost(neighbour, cw) // если сосед дороже, то делаю его дешевле
 		}
 		listNeigbours = append(listNeigbours, neighbour) // добавляю соседа в список соседей для поиска мин.
-	} // повторяю со всеми соседями
+	}
 	g.offNode(n) // отключаю базу
 
 	if len(listNeigbours) <= 1 { // прекращаю если в списке 1 или меньше узлов
@@ -128,12 +128,11 @@ func (g *graph) findLowCosts(n node) {
 func (g *graph) createRoute(n node) {
 	neighbours := g.nodes[n.name].neighbour
 	for i := range neighbours {
-		if (n.cost - g.checkEdge(n.name, neighbours[i])) == 0 {
-			// if g.nodes[neighbours[i]].cost == 0 {
+		switch n.cost - g.checkEdge(n.name, neighbours[i]) {
+		case 0:
 			g.sequence.PushFront(g.nodes[neighbours[i]])
 			return
-		}
-		if g.nodes[neighbours[i]].cost == (n.cost - g.checkEdge(n.name, neighbours[i])) {
+		case g.nodes[neighbours[i]].cost:
 			g.sequence.PushFront(g.nodes[neighbours[i]])
 			g.createRoute(g.nodes[neighbours[i]])
 		}
@@ -178,9 +177,9 @@ func main() {
 	g.addEdge(c3, d4, 11)
 	g.addEdge(f6, c3, 2)
 	g.addEdge(e5, f6, 9)
-	g.addEdge(d4, e5, 6)
+	g.addEdge(e5, d4, 6)
 
-	g.dijkstra(e5, a1) //при поиске e5-a1 ошибки
+	g.dijkstra(e5, a1) //при поиске e5-a1 ошибки 3 должно быть 3(11.00) и путь 5-6-3-1
 	fmt.Println("Весь граф:", g)
 
 }
